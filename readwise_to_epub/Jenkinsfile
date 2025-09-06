@@ -30,7 +30,7 @@ pipeline {
             steps {
                 sh '''
                     #!/usr/bin/env bash
-                    set -euxo pipefail
+                    set -eux
                     export DEBIAN_FRONTEND=noninteractive
                     
                     # Update package list and install necessary system tools
@@ -46,7 +46,7 @@ pipeline {
             steps {
                 sh '''
                     #!/usr/bin/env bash
-                    set -euxo pipefail
+                    set -eux
 
                     # Create and activate a Python virtual environment
                     python3 -m venv venv
@@ -62,7 +62,7 @@ pipeline {
             steps {
                 sh '''
                     #!/usr/bin/env bash
-                    set -euxo pipefail
+                    set -eux
 
                     # Download kepubify
                     wget https://github.com/pgaskin/kepubify/releases/download/v4.0.4/kepubify-linux-64bit
@@ -81,7 +81,7 @@ pipeline {
             steps {
                 sh '''
                     #!/usr/bin/env bash
-                    set -euxo pipefail
+                    set -eux
                     
                     # Activate the virtual environment
                     . venv/bin/activate
