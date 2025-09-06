@@ -1,3 +1,4 @@
 requests
-ebooklib
+EbookLib
 beautifulsoup4
+python-dateutil
