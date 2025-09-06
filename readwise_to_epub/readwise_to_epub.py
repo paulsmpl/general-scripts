@@ -132,7 +132,7 @@ def create_epub(article, category):
     print(f"\u2705 EPUB created: {epub_filename}")
 
     try:
-        subprocess.run(["kepubify", epub_filename], check=True)
+        subprocess.run(["/usr/local/bin/kepubify", epub_filename], check=True)
         print(f"\U0001F4D8 Converted to Kepub with kepubify.")
 
         converted_name = os.path.join(base_filename + "_converted.kepub.epub")
