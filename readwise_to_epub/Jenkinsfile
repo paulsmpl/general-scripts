@@ -8,7 +8,7 @@ pipeline {
         GAS_ENDPOINT_EPUBS_PROCESSED_TRACKER = credentials('GAS_ENDPOINT_EPUBS_PROCESSED_TRACKER')
 
         // App-specific variables
-        # No extra app params needed for this script
+        // No extra app params needed for this script
     }
 
     options {
