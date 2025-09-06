@@ -11,6 +11,25 @@ pipeline {
     }
 
     stages {
+        stage('Install kepubify') {
+            steps {
+                sh '''
+                    # Download the correct version of kepubify for Linux 64-bit
+                    wget https://github.com/pgaskin/kepubify/releases/download/v4.0.4/kepubify-linux-64bit
+
+                    # Make the downloaded file executable
+                    chmod +x kepubify-linux-64bit
+                    
+                    # Move the executable to a directory in the PATH
+                    # Note: /usr/local/bin is a standard location
+                    # You may need to use 'sudo' if the jenkins user doesn't have permissions
+                    sudo mv kepubify-linux-64bit /usr/local/bin/kepubify
+
+                    # Verify installation
+                    kepubify --version
+                '''
+            }
+        }
         stage('Setup Environment and Dependencies') {
             steps {
                 sh '''
