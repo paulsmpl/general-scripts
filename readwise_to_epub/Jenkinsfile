@@ -6,7 +6,7 @@ pipeline {
         EPUB_READWISE_TOKEN = credentials('EPUB_READWISE_TOKEN')
         EPUB_FTP_PASS = credentials('EPUB_FTP_PASS')
         GAS_ENDPOINT_EPUBS_PROCESSED_TRACKER = credentials('GAS_ENDPOINT_EPUBS_PROCESSED_TRACKER')
-
+        GAS_UPLOAD_EPUB_ENDPOINT = credentials('GAS_UPLOAD_EPUB_ENDPOINT')
         // App-specific variables
         // No extra app params needed for this script
     }

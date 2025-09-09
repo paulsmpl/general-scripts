@@ -21,7 +21,7 @@ KV_LAST_UPDATED_AT_KEY = "lastUpdatedAt"
 CATEGORIES = ["pdf", "article", "email", "rss", "twitter"]
 
 # === GOOGLE APPS SCRIPT CONFIGURATION ===
-GAS_UPLOAD_ENDPOINT = os.environ["GAS_UPLOAD_EPUB_ENDPOINT"]
+GAS_UPLOAD_EPUB_ENDPOINT = os.environ["GAS_UPLOAD_EPUB_ENDPOINT"]
 GAS_PROCESSED_ENDPOINT = os.environ["GAS_ENDPOINT_EPUBS_PROCESSED_TRACKER"]
 PROCESSED_SHEET_NAME = "_Processed_Articles"
 
@@ -40,7 +40,7 @@ def upload_to_gas(filepath):
         }
 
         headers = {"Content-Type": "application/json"}
-        response = requests.post(GAS_UPLOAD_ENDPOINT, headers=headers, data=json.dumps(data))
+        response = requests.post(GAS_UPLOAD_EPUB_ENDPOINT, headers=headers, data=json.dumps(data))
         response.raise_for_status()
         print(f"\U0001F680 Uploaded {filename} to GAS endpoint.")
     except Exception as e:
