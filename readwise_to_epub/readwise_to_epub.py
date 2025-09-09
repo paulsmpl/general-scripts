@@ -1,4 +1,6 @@
 import os
+import base64
+import json
 from urllib.parse import urlparse
 import requests
 import subprocess
@@ -7,7 +9,6 @@ from bs4 import BeautifulSoup
 from ftplib import FTP
 from datetime import datetime, timedelta, timezone
 from dateutil import parser
-
 
 # === CONFIGURATION ===
 READWISE_TOKEN = os.environ["EPUB_READWISE_TOKEN"]
@@ -19,14 +20,36 @@ APP_KEY = "3cg7aby9"
 KV_LAST_UPDATED_AT_KEY = "lastUpdatedAt"
 CATEGORIES = ["pdf", "article", "email", "rss", "twitter"]
 
-# === NEW: GOOGLE APPS SCRIPT CONFIG ===
-GAS_ENDPOINT = os.environ["GAS_ENDPOINT_EPUBS_PROCESSED_TRACKER"]
+# === GOOGLE APPS SCRIPT CONFIGURATION ===
+GAS_UPLOAD_ENDPOINT = os.environ["GAS_UPLOAD_EPUB_ENDPOINT"]
+GAS_PROCESSED_ENDPOINT = os.environ["GAS_ENDPOINT_EPUBS_PROCESSED_TRACKER"]
 PROCESSED_SHEET_NAME = "_Processed_Articles"
-# === NEW: GOOGLE APPS SCRIPT ENDPOINTS ===
-def is_processed(article_id):
-    """Checks if an article ID is in the processed sheet via the GAS endpoint."""
+
+# === GOOGLE APPS SCRIPT UPLOAD ===
+def upload_to_gas(filepath):
+    """Envoie un fichier .kepub.epub encodé en base64 vers le GAS endpoint"""
     try:
-        url = f"{GAS_ENDPOINT}?sheet={PROCESSED_SHEET_NAME}&value={article_id}"
+        filename = os.path.basename(filepath)
+        with open(filepath, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode("utf-8")
+
+        data = {
+            "filename": filename,
+            "mimeType": "application/epub+zip",
+            "data": encoded
+        }
+
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(GAS_UPLOAD_ENDPOINT, headers=headers, data=json.dumps(data))
+        response.raise_for_status()
+        print(f"\U0001F680 Uploaded {filename} to GAS endpoint.")
+    except Exception as e:
+        print(f"\u274C Failed to upload {filepath} to GAS: {e}")
+
+# === GOOGLE APPS SCRIPT: PROCESSED STATUS ===
+def is_processed(article_id):
+    try:
+        url = f"{GAS_PROCESSED_ENDPOINT}?sheet={PROCESSED_SHEET_NAME}&value={article_id}"
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
@@ -36,9 +59,8 @@ def is_processed(article_id):
         return False
 
 def mark_as_processed(article_id):
-    """Stores an article ID in the processed sheet via the GAS endpoint."""
     try:
-        url = f"{GAS_ENDPOINT}?sheet={PROCESSED_SHEET_NAME}"
+        url = f"{GAS_PROCESSED_ENDPOINT}?sheet={PROCESSED_SHEET_NAME}"
         headers = {"Content-Type": "application/json"}
         data = {"value": article_id}
         response = requests.post(url, headers=headers, json=data)
@@ -49,10 +71,7 @@ def mark_as_processed(article_id):
         print(f"\u274C Failed to mark article ID {article_id} as processed: {e}")
         return False
 
-# === KEYVALUE API ===
-# The functions below (`get_last_processed_timestamp` and `update_last_processed_timestamp`)
-# are kept for tracking the timestamp of the last fetch, but the processed articles
-# are now managed by the new GAS functions.
+# === TIMESTAMP TRACKING ===
 def get_last_processed_timestamp():
     url = f"https://keyvalue.immanuel.co/api/KeyVal/GetValue/{APP_KEY}/{KV_LAST_UPDATED_AT_KEY}"
     response = requests.get(url)
@@ -99,7 +118,6 @@ def create_epub(article, category):
         return None
 
     print(f"\n\U0001F4DA Creating EPUB for [{category}] '{title}'")
-
     cleaned = BeautifulSoup(content, "html.parser").prettify()
     header = f"<h1>{title}</h1>\n"
     header += f"<p><strong>Category:</strong> {category}</p>\n"
@@ -134,7 +152,6 @@ def create_epub(article, category):
     try:
         subprocess.run(["/usr/local/bin/kepubify", epub_filename], check=True)
         print(f"\U0001F4D8 Converted to Kepub with kepubify.")
-
         converted_name = os.path.join(base_filename + "_converted.kepub.epub")
         if os.path.exists(converted_name):
             print(f"\u2705 Kepub file ready: {converted_name}")
@@ -160,47 +177,36 @@ def main():
     try:
         last_processed_ts = get_last_processed_timestamp()
         print(f"\U0001F511 Last processed timestamp: {last_processed_ts}")
-
         all_new_items = []
-        
+
         for category in CATEGORIES:
             items = fetch_items_by_category(category)
             items_sorted = sorted(items, key=lambda x: x['updated_at'])
-            
             for item in items_sorted:
                 item_updated_at = parser.isoparse(item['updated_at'])
                 item_epoch = int(item_updated_at.timestamp())
-                
-                # Check if the article is more recent and not already processed
                 if (not last_processed_ts or item_epoch > last_processed_ts) and not is_processed(item['id']):
                     all_new_items.append((item, category))
-        
+
         if all_new_items:
             print(f"\U0001F4C4 Processing {len(all_new_items)} new item(s) found across all categories.")
-            
             latest_processed_ts = last_processed_ts
             for item, category in all_new_items:
                 item_updated_at = parser.isoparse(item['updated_at'])
                 item_epoch = int(item_updated_at.timestamp())
-                
                 epub_file = create_epub(item, category)
                 if epub_file:
                     upload_ftp(epub_file)
-                    mark_as_processed(item['id']) # Mark as processed after successful upload
-                    #os.remove(epub_file)
-                    #print(f"\U0001F9F9 Deleted local file: {epub_file}")
-                
+                    upload_to_gas(epub_file)
+                    mark_as_processed(item['id'])
                 latest_processed_ts = max(latest_processed_ts, item_epoch)
-            
             update_last_processed_timestamp(latest_processed_ts)
             print("\n\U0001F389 All categories processed.")
         else:
             print("\n\u2705 No new items to process.")
-            
     except Exception as e:
         print(f"\u274C Error: {e}")
-        
-# === RESET TIMESTAMP ===
+
 def reset_last_processed_timestamp(minutes_back=10):
     new_timestamp = int((datetime.utcnow() - timedelta(minutes=minutes_back)).timestamp())
     url = f"https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/{APP_KEY}/{KV_LAST_UPDATED_AT_KEY}/{new_timestamp}"
